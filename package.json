@@ -1,0 +1,123 @@
+{
+	"name": "llm-lint",
+	"displayName": "LLM Lint",
+	"description": "Local LLM-powered code review as VS Code diagnostics",
+	"version": "0.0.1",
+	"engines": {
+		"vscode": "^1.90.0"
+	},
+	"contributes": {
+		"configuration": {
+			"title": "LLM Lint",
+			"properties": {
+				"llmLint.model": {
+					"type": "string",
+					"default": "qwen3-30b-a3b-mlx",
+					"description": "モデル名"
+				},
+				"llmLint.port": {
+					"type": "number",
+					"default": 1234,
+					"description": "LM Studio サーバポート"
+				},
+				"llmLint.threads": {
+					"type": "number",
+					"default": 4,
+					"description": "cpuThreads の値 (0=デフォルト)"
+				},
+				"llmLint.excludePatterns": {
+					"type": "array",
+					"default": [
+						"**/.git/**",
+						"**/.vscode/**",
+						"**/node_modules/**",
+						"**/out/**",
+						"**/dist/**",
+						"**/build/**"
+					],
+					"description": "レビュー対象から除外するファイルパターン（glob形式）"
+				},
+				"llmLint.includePatterns": {
+					"type": "array",
+					"default": [],
+					"description": "レビュー対象に含めるファイルパターン（glob形式）。指定した場合は、これらのパターンのみが対象になります。"
+				},
+				"llmLint.useFunctionCalling": {
+					"type": "boolean",
+					"default": true,
+					"description": "Function Callingモードを使用するかどうか（OpenAIと互換性のあるモデルのみ）"
+				},
+				"llmLint.autoReviewOnOpen": {
+					"type": "boolean",
+					"default": true,
+					"description": "ファイルを開いたときに自動レビューを実行するかどうか"
+				},
+				"llmLint.showInProblemsTab": {
+					"type": "boolean",
+					"default": true,
+					"description": "レビュー結果をVS Codeの問題タブに反映するかどうか"
+				}
+			}
+		},
+		"viewsContainers": {
+			"panel": [
+				{
+					"id": "llmReviewer",
+					"title": "llm-reviewer",
+					"icon": "resources/icon.svg"
+				}
+			]
+		},
+		"views": {
+			"llmReviewer": [
+				{
+					"id": "llmReviewerView",
+					"name": "Review Results",
+					"icon": "resources/icon.svg"
+				}
+			]
+		},
+		"commands": [
+			{
+				"command": "llm-reviewer.reviewCurrentFile",
+				"title": "LLM: ファイルをレビュー",
+				"category": "LLM Reviewer"
+			},
+			{
+				"command": "llm-reviewer.toggleAutoReview",
+				"title": "LLM: 自動レビューの切り替え",
+				"category": "LLM Reviewer"
+			},
+			{
+				"command": "llm-reviewer.toggleAutoReviewOnOpen",
+				"title": "LLM: オープン時自動レビューの切り替え",
+				"category": "LLM Reviewer"
+			}
+		]
+	},
+	"activationEvents": [
+		"onLanguage:javascript",
+		"onLanguage:typescript",
+		"onLanguage:python",
+		"onLanguage:go",
+		"onLanguage:rust",
+		"onLanguage:c",
+		"onLanguage:cpp"
+	],
+	"main": "./out/extension.js",
+	"scripts": {
+		"watch": "esbuild src/extension.ts --bundle --platform=node --outfile=out/extension.js --format=cjs --sourcemap --watch  --external:vscode",
+		"build": "esbuild src/extension.ts --bundle --platform=node --outfile=out/extension.js --format=cjs --minify --external:vscode"
+	},
+	"dependencies": {
+		"node-fetch": "^3.3.2",
+		"p-queue": "^8.1.0"
+	},
+	"devDependencies": {
+		"esbuild": "^0.21.0",
+		"@types/node": "^20.11.30",
+		"@types/node-fetch": "^3.0.3",
+		"@types/vscode": "^1.90.0",
+		"typescript": "^5.4.5"
+	}
+}
