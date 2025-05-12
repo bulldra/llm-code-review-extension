@@ -105,6 +105,10 @@
 		"onLanguage:cpp"
 	],
 	"main": "./out/extension.js",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/bulldra/llm-code-review-extension.git"
+	},
 	"scripts": {
 		"watch": "esbuild src/extension.ts --bundle --platform=node --outfile=out/extension.js --format=cjs --sourcemap --watch  --external:vscode",
 		"build": "esbuild src/extension.ts --bundle --platform=node --outfile=out/extension.js --format=cjs --minify --external:vscode"
