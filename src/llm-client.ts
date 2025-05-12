@@ -90,7 +90,6 @@ export async function requestLLMReviewWithFunctionCalling(
 	OUTPUT: vscode.OutputChannel
 ): Promise<string> {
 	const prompt = [
-		'/no_think',
 		'```',
 		doc.getText(),
 		'```',

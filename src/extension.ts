@@ -1,8 +1,8 @@
 import * as vscode from 'vscode'
 import { requestLLMReviewWithFunctionCalling, LLM_CONFIG } from './llm-client'
 
-// アウトプットチャネルを先に宣言
-const OUTPUT = vscode.window.createOutputChannel('llm-reviewer')
+//
+const LLM_REVIEWER_CONSOLE = vscode.window.createOutputChannel('llm-reviewer')
 
 // DiagnosticCollection（問題タブ用）を宣言
 const diagnosticCollection =
@@ -111,7 +111,9 @@ class ReviewTreeDataProvider implements vscode.TreeDataProvider<ReviewItem> {
 	private _treeView?: vscode.TreeView<ReviewItem> // TreeViewインスタンスへの参照を追加
 
 	constructor() {
-		OUTPUT.appendLine('[llm-reviewer] ReviewTreeDataProvider initialized')
+		LLM_REVIEWER_CONSOLE.appendLine(
+			'[llm-reviewer] ReviewTreeDataProvider initialized'
+		)
 	}
 
 	// TreeViewインスタンスを設定するメソッド
@@ -426,7 +428,9 @@ class ReviewTreeDataProvider implements vscode.TreeDataProvider<ReviewItem> {
 			this._reviewItemsByFile.delete(uriString)
 			this.updateBadge() // バッジも更新
 			this._onDidChangeTreeData.fire()
-			OUTPUT.appendLine(`[llm-reviewer] Cleared reviews for ${uriString}`)
+			LLM_REVIEWER_CONSOLE.appendLine(
+				`[llm-reviewer] Cleared reviews for ${uriString}`
+			)
 		}
 		// 問題タブの診断結果もクリア
 		const doc = vscode.workspace.textDocuments.find(
@@ -475,7 +479,6 @@ const INCLUDE_PATTERNS =
 		.getConfiguration()
 		.get<string[]>('llmLint.includePatterns') || []
 
-/** 言語IDが典型的なプログラミング言語か判定 */
 function isProgrammingLanguage(languageId: string): boolean {
 	const ids = new Set([
 		'javascript',
@@ -551,7 +554,7 @@ function shouldExclude(fsPath: string): boolean {
 		)
 		// includeパターンにマッチしない場合は除外
 		if (!included) {
-			OUTPUT.appendLine(
+			LLM_REVIEWER_CONSOLE.appendLine(
 				`[llm-reviewer] Excluding ${fsPath} (does not match include patterns)`
 			)
 			return true
@@ -568,7 +571,7 @@ function shouldExclude(fsPath: string): boolean {
  * ----------------------------  拡張機能のエントリーポイント  ----------------------------
  */
 export async function activate(ctx: vscode.ExtensionContext) {
-	OUTPUT.appendLine('[llm-reviewer] activate called')
+	LLM_REVIEWER_CONSOLE.appendLine('[llm-reviewer] activate called')
 
 	// ツリービューのみを登録する
 	const treeView = vscode.window.createTreeView('llmReviewerView', {
@@ -586,8 +589,18 @@ export async function activate(ctx: vscode.ExtensionContext) {
 		if (!isProgrammingLanguage(doc.languageId)) return
 		// 除外パターンに一致するファイルはスキップ
 		if (shouldExclude(doc.uri.fsPath)) {
-			OUTPUT.appendLine(
+			LLM_REVIEWER_CONSOLE.appendLine(
 				`[llm-reviewer] Skipping lint for ${doc.fileName} (excluded by pattern)`
+			)
+			return
+		}
+		// ★ここで「現在開かれているファイル」かどうかを判定
+		const isOpen = vscode.window.visibleTextEditors.some(
+			(editor) => editor.document.uri.toString() === doc.uri.toString()
+		)
+		if (!isOpen) {
+			LLM_REVIEWER_CONSOLE.appendLine(
+				`[llm-reviewer] Skipping lint for ${doc.fileName} (not open in any editor)`
 			)
 			return
 		}
@@ -595,7 +608,7 @@ export async function activate(ctx: vscode.ExtensionContext) {
 		const now = Date.now()
 		const last = lastRunMap.get(uri) ?? 0
 		if (now - last < 30000) {
-			OUTPUT.appendLine(
+			LLM_REVIEWER_CONSOLE.appendLine(
 				`[llm-reviewer] Skipping lint for ${doc.fileName} (cooldown)`
 			)
 			return
@@ -611,7 +624,7 @@ export async function activate(ctx: vscode.ExtensionContext) {
 		.getConfiguration()
 		.get<boolean>('llmLint.autoReviewOnOpen', true)
 
-	OUTPUT.appendLine(
+	LLM_REVIEWER_CONSOLE.appendLine(
 		`[llm-reviewer] ファイルオープン時の自動レビュー: ${
 			autoReviewOnOpenEnabled ? '有効' : '無効'
 		}`
@@ -715,6 +728,10 @@ export async function activate(ctx: vscode.ExtensionContext) {
 		const doc = vscode.window.activeTextEditor.document
 		// 少し遅延させて実行（起動直後の負荷を軽減）
 		setTimeout(() => lintIfNeeded(doc), 2000)
+	} else {
+		LLM_REVIEWER_CONSOLE.appendLine(
+			'[llm-reviewer] 起動時に開かれているファイルがないため、自動レビューはスキップされました'
+		)
 	}
 
 	ctx.subscriptions.push(
@@ -727,7 +744,7 @@ export async function activate(ctx: vscode.ExtensionContext) {
 		vscode.workspace.onDidCloseTextDocument((doc) => {
 			reviewTreeProvider.clearFileReviews(doc.uri.toString())
 		}),
-		OUTPUT,
+		LLM_REVIEWER_CONSOLE,
 		diagnosticCollection
 	)
 
@@ -821,7 +838,7 @@ function updateDiagnostics(doc: vscode.TextDocument, reviewText: string): void {
 	// 診断コレクションを更新（以前の診断はすべて削除される）
 	diagnosticCollection.set(doc.uri, diagnostics)
 
-	OUTPUT.appendLine(
+	LLM_REVIEWER_CONSOLE.appendLine(
 		`[llm-reviewer] ${diagnostics.length} diagnostics added to ${doc.fileName}`
 	)
 }
@@ -830,10 +847,10 @@ async function lintDocument(doc: vscode.TextDocument): Promise<void> {
 	const uriString = doc.uri.toString() // URI文字列（TreeViewのキーとして使用）
 	const filePath = doc.fileName // 実際のファイルパスを取得
 
-	OUTPUT.appendLine(`[llm-reviewer] Start lint → ${filePath}`)
+	LLM_REVIEWER_CONSOLE.appendLine(`[llm-reviewer] Start lint → ${filePath}`)
 
 	// アウトプットチャネルを確実に表示
-	OUTPUT.show(true)
+	LLM_REVIEWER_CONSOLE.show(true)
 
 	try {
 		// Lint実行前に該当ファイルのレビューをクリア
@@ -846,10 +863,20 @@ async function lintDocument(doc: vscode.TextDocument): Promise<void> {
 		const statusMessage =
 			vscode.window.setStatusBarMessage('LLMによるレビュー実行中...')
 
-		let fullText: string = await requestLLMReviewWithFunctionCalling(
-			doc,
-			OUTPUT
-		)
+		let fullText: string
+		try {
+			fullText = await requestLLMReviewWithFunctionCalling(
+				doc,
+				LLM_REVIEWER_CONSOLE
+			)
+		} catch (llmError) {
+			LLM_REVIEWER_CONSOLE.appendLine(
+				`[llm-reviewer] LLMリクエスト中にエラー: ${llmError}`
+			)
+			vscode.window.showErrorMessage(`LLMリクエストエラー: ${llmError}`)
+			statusMessage.dispose()
+			return
+		}
 
 		// TreeViewを更新
 		reviewTreeProvider.update(uriString, fullText)
@@ -862,11 +889,11 @@ async function lintDocument(doc: vscode.TextDocument): Promise<void> {
 		// 設定がtrueの場合のみ診断機能（問題タブ）に反映
 		if (showInProblemsTab) {
 			updateDiagnostics(doc, fullText)
-			OUTPUT.appendLine(
+			LLM_REVIEWER_CONSOLE.appendLine(
 				`[llm-reviewer] レビュー結果を問題タブに反映しました`
 			)
 		} else {
-			OUTPUT.appendLine(
+			LLM_REVIEWER_CONSOLE.appendLine(
 				`[llm-reviewer] 設定により問題タブへの反映はスキップされました`
 			)
 		}
@@ -878,7 +905,7 @@ async function lintDocument(doc: vscode.TextDocument): Promise<void> {
 		// ステータスバーメッセージをクリア
 		statusMessage.dispose()
 	} catch (error) {
-		OUTPUT.appendLine(
+		LLM_REVIEWER_CONSOLE.appendLine(
 			`[llm-reviewer] Error during lint for ${filePath}: ${error}`
 		)
 		vscode.window.showErrorMessage(`LLM Lint Error: ${error}`)
